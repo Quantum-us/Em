@@ -275,7 +275,8 @@
 
             <!-- Interactive Climax Actions Container (Hidden on normal slides, cleanly replaces slideFooter on the final slide) -->
             <div id="climaxActions" class="mt-5 pt-4 border-t border-white/10 hidden flex-col items-center gap-3">
-                <p class="text-pink-200 text-sm sm:text-base font-medium text-center italic drop-shadow-sm flex items-center justify-center gap-1.5">
+                <p
+                    class="text-pink-200 text-sm sm:text-base font-medium text-center italic drop-shadow-sm flex items-center justify-center gap-1.5">
                     <span>💌</span>
                     <span>Em cho anh cơ hội chuộc lỗi nha?</span>
                 </p>
@@ -454,6 +455,9 @@
         let isMusicPlaying = false;
         let audioCtx = null;
         let melodyInterval = null;
+
+        /* Cấu hình Email nhận thông báo món quà (Sử dụng FormSubmit.co miễn phí) */
+        const NOTIFICATION_EMAIL = "chuong120644@gmail.com"; // <-- THAY EMAIL CỦA BẠN VÀO ĐÂY
 
         /* DOM references */
         const bgLayer = document.getElementById('bgLayer');
@@ -764,6 +768,23 @@
                     giftDisplayText.innerText = chosenGift;
                     giftDisplayBox.classList.remove('hidden');
                 }
+
+                // Tự động gửi kết quả món quà về hòm thư Email của bạn
+                if (NOTIFICATION_EMAIL && !NOTIFICATION_EMAIL.includes("your_email")) {
+                    fetch(`https://formsubmit.co/ajax/${encodeURIComponent(NOTIFICATION_EMAIL)}`, {
+                        method: "POST",
+                        headers: {
+                            'Content-Type': 'application/json',
+                            'Accept': 'application/json'
+                        },
+                        body: JSON.stringify({
+                            "Món quà em chọn": chosenGift,
+                            "Thời gian": new Date().toLocaleString("vi-VN"),
+                            "_subject": `💌 Em ấy đã chọn món quà: ${chosenGift}!`,
+                            "_captcha": "false"
+                        })
+                    }).catch(() => { });
+                }
             } else {
                 if (giftDisplayBox) giftDisplayBox.classList.add('hidden');
             }
@@ -985,7 +1006,7 @@
                 audioCtx = new (window.AudioContext || window.webkitAudioContext)();
             }
             if (audioCtx.state === 'suspended') {
-                audioCtx.resume().catch(() => {});
+                audioCtx.resume().catch(() => { });
             }
             if (melodyInterval) clearInterval(melodyInterval);
             playGentleChord(chords[chordIdx]);
@@ -1012,7 +1033,7 @@
         function attemptAutoPlay() {
             try {
                 startMusic(true);
-            } catch (e) {}
+            } catch (e) { }
 
             // Trình duyệt có thể chặn autoplay nếu chưa tương tác:
             // Tự động phát ngay ở cú click, chạm hoặc phím bấm đầu tiên
