@@ -1,0 +1,1061 @@
+<!DOCTYPE html>
+<html lang="vi">
+
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
+    <title>Gửi em</title>
+
+    <!-- Tailwind CSS & Google Fonts -->
+    <script src="https://cdn.tailwindcss.com"></script>
+    <link rel="preconnect" href="https://fonts.googleapis.com">
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+    <link
+        href="https://fonts.googleapis.com/css2?family=Dancing+Script:wght@600;700&family=Quicksand:wght@400;500;600;700&family=Be+Vietnam+Pro:ital,wght@0,300;0,400;0,500;0,600;1,300;1,400&display=swap"
+        rel="stylesheet">
+
+    <!-- Canvas Confetti for special interactions -->
+    <script src="https://cdn.jsdelivr.net/npm/canvas-confetti@1.9.3/dist/confetti.browser.min.js"></script>
+
+    <style>
+        * {
+            -webkit-tap-highlight-color: transparent;
+            user-select: none;
+        }
+
+        .editable-text {
+            user-select: text;
+        }
+
+        body {
+            font-family: 'Be Vietnam Pro', 'Quicksand', sans-serif;
+            overflow: hidden;
+            touch-action: manipulation;
+        }
+
+        .font-handwriting {
+            font-family: 'Dancing Script', cursive;
+        }
+
+        .font-rounded {
+            font-family: 'Quicksand', sans-serif;
+        }
+
+        /* Glassmorphism effects */
+        .glass-card {
+            background: rgba(255, 255, 255, 0.18);
+            backdrop-filter: blur(16px);
+            -webkit-backdrop-filter: blur(16px);
+            border: 1px solid rgba(255, 255, 255, 0.35);
+            box-shadow: 0 20px 50px rgba(0, 0, 0, 0.25);
+        }
+
+        .glass-pill {
+            background: rgba(255, 255, 255, 0.2);
+            backdrop-filter: blur(12px);
+            -webkit-backdrop-filter: blur(12px);
+            border: 1px solid rgba(255, 255, 255, 0.3);
+        }
+
+        .dark-overlay {
+            background: radial-gradient(circle at center, rgba(15, 23, 42, 0.45) 0%, rgba(10, 15, 29, 0.82) 100%);
+        }
+
+        /* Smooth slide animations */
+        .slide-enter-right {
+            animation: enterRight 0.5s cubic-bezier(0.16, 1, 0.3, 1) forwards;
+        }
+
+        .slide-enter-left {
+            animation: enterLeft 0.5s cubic-bezier(0.16, 1, 0.3, 1) forwards;
+        }
+
+        .slide-exit-left {
+            animation: exitLeft 0.4s cubic-bezier(0.7, 0, 0.84, 0) forwards;
+        }
+
+        .slide-exit-right {
+            animation: exitRight 0.4s cubic-bezier(0.7, 0, 0.84, 0) forwards;
+        }
+
+        @keyframes enterRight {
+            from {
+                opacity: 0;
+                transform: translateX(60px) scale(0.96);
+            }
+
+            to {
+                opacity: 1;
+                transform: translateX(0) scale(1);
+            }
+        }
+
+        @keyframes enterLeft {
+            from {
+                opacity: 0;
+                transform: translateX(-60px) scale(0.96);
+            }
+
+            to {
+                opacity: 1;
+                transform: translateX(0) scale(1);
+            }
+        }
+
+        @keyframes exitLeft {
+            from {
+                opacity: 1;
+                transform: translateX(0) scale(1);
+            }
+
+            to {
+                opacity: 0;
+                transform: translateX(-60px) scale(0.96);
+            }
+        }
+
+        @keyframes exitRight {
+            from {
+                opacity: 1;
+                transform: translateX(0) scale(1);
+            }
+
+            to {
+                opacity: 0;
+                transform: translateX(60px) scale(0.96);
+            }
+        }
+
+        @keyframes fadeInScale {
+            from {
+                opacity: 0;
+                transform: scale(0.92);
+            }
+
+            to {
+                opacity: 1;
+                transform: scale(1);
+            }
+        }
+
+        .animate-enter {
+            animation: fadeInScale 0.6s cubic-bezier(0.16, 1, 0.3, 1) forwards;
+        }
+
+        /* Floating particles background canvas */
+        #particleCanvas {
+            position: absolute;
+            top: 0;
+            left: 0;
+            width: 100%;
+            height: 100%;
+            pointer-events: none;
+            z-index: 10;
+        }
+
+        /* Custom subtle scrollbar for story content */
+        .custom-scroll::-webkit-scrollbar {
+            width: 4px;
+        }
+
+        .custom-scroll::-webkit-scrollbar-thumb {
+            background: rgba(255, 255, 255, 0.3);
+            border-radius: 9999px;
+        }
+
+        /* Justify story text lines evenly */
+        #slideBody {
+            text-align: justify;
+            text-justify: inter-word;
+        }
+    </style>
+</head>
+
+<body class="relative w-screen h-screen overflow-hidden text-white flex items-center justify-center">
+
+    <div id="bgLayer"
+        class="absolute inset-0 bg-cover bg-center transition-all duration-700 ease-out transform scale-105"
+        style="background-image: url('background.png');">
+    </div>
+
+    <!-- Subtle Vignette & Tint Overlay -->
+    <div class="absolute inset-0 dark-overlay transition-opacity duration-500 pointer-events-none"></div>
+
+    <!-- Particle / Petals / Stars Canvas -->
+    <canvas id="particleCanvas"></canvas>
+
+    <header class="fixed top-0 left-0 right-0 p-4 md:p-6 flex items-center justify-between z-30 pointer-events-none">
+        <!-- Progress Indicator -->
+        <div class="pointer-events-auto flex items-center gap-1.5 md:gap-2 px-3 py-1.5 rounded-full glass-pill shadow-sm"
+            id="progressContainer">
+            <!-- Dots injected dynamically -->
+        </div>
+
+        <!-- Quick action buttons (Music, Edit Mode, Background Settings) -->
+        <div class="pointer-events-auto flex items-center gap-2">
+            <!-- Audio Toggle Button -->
+            <button id="musicBtn" title="Bật/Tắt nhạc nền"
+                class="p-2.5 rounded-full glass-pill hover:bg-white/30 transition active:scale-95 text-rose-200">
+                <svg id="musicIconMuted" class="w-5 h-5" fill="none" stroke="currentColor" stroke-width="2"
+                    viewBox="0 0 24 24">
+                    <path stroke-linecap="round" stroke-linejoin="round"
+                        d="M5.586 15H4a1 1 0 01-1-1v-4a1 1 0 011-1h1.586l4.707-4.707C10.923 3.663 12 4.109 12 5v14c0 .891-1.077 1.337-1.707.707L5.586 15z" />
+                    <path stroke-linecap="round" stroke-linejoin="round" d="M17 14l2-2m0 0l2-2m-2 2l-2-2m2 2l2 2" />
+                </svg>
+                <svg id="musicIconPlaying" class="w-5 h-5 hidden animate-pulse" fill="none" stroke="currentColor"
+                    stroke-width="2" viewBox="0 0 24 24">
+                    <path stroke-linecap="round" stroke-linejoin="round"
+                        d="M9 19V6l12-3v13M9 19c0 1.105-1.343 2-3 2s-3-.895-3-2 1.343-2 3-2 3 .895 3 2zm12 0c0 1.105-1.343 2-3 2s-3-.895-3-2 1.343-2 3-2 3 .895 3 2zM9 10l12-3" />
+                </svg>
+            </button>
+        </div>
+    </header>
+
+    <main class="relative z-20 w-full max-w-xl mx-4 sm:mx-6 flex flex-col items-center">
+
+        <!-- Active Slide Card -->
+        <div id="storyCard"
+            class="w-full glass-card rounded-3xl p-6 sm:p-9 flex flex-col justify-between min-h-[460px] sm:min-h-[520px] transition-transform">
+
+            <!-- Top meta info: Chapter & Date Tag -->
+            <div>
+                <div class="flex items-center justify-between text-xs tracking-widest uppercase text-pink-200/80 mb-3">
+                    <span id="slideTag" class="px-2.5 py-0.5 rounded-full bg-white/10 font-medium">Chuyện ngày
+                        30/09/2026</span>
+                    <span id="slideDate" class="editable-content font-mono" contenteditable="false"></span>
+                </div>
+
+                <!-- Slide Title -->
+                <h2 id="slideTitle"
+                    class="text-2xl sm:text-3xl font-bold tracking-tight text-white mb-4 drop-shadow-sm editable-content leading-snug">
+                    Anh muốn kể em nghe...
+                </h2>
+
+                <!-- Slide Body Text with custom scroll for long messages -->
+                <div class="max-h-[220px] sm:max-h-[270px] overflow-y-auto custom-scroll pr-1.5">
+                    <p id="slideBody"
+                        class="text-white/90 text-base sm:text-lg leading-relaxed font-light whitespace-pre-line editable-content text-justify">
+                        Là bạn anh gặp lại anh sau một kỳ nghỉ hè thì thấy anh có những dấu hiệu khác lạ so với trước
+                        nên khuyên anh đi khám thử xem sao.
+                        Anh đi khám, nói hết những biểu hiện và cảm nhận của bản thân thì bác sĩ phán anh bị ...</p>
+                    <div id="slideImageContainer"
+                        class="hidden mt-3 rounded-2xl overflow-hidden border border-white/20 shadow-lg group relative">
+                        <img id="slideImage" src="" alt="Món quà chuộc lỗi"
+                            class="w-full h-auto max-h-52 object-cover rounded-xl cursor-pointer hover:scale-[1.02] transition duration-300">
+                        <span
+                            class="absolute bottom-2 right-2 text-[10px] bg-black/60 px-2 py-0.5 rounded-full text-white/80 pointer-events-none">Bấm
+                            để phóng to</span>
+                    </div>
+                </div>
+            </div>
+
+            <!-- Action Footer (Buttons for standard slides 1-4) -->
+            <div id="slideFooter" class="mt-6 pt-4 border-t border-white/10 flex items-center justify-between gap-3">
+                <!-- Navigation Buttons -->
+                <button id="prevBtn"
+                    class="flex items-center gap-1.5 px-4 py-2 rounded-xl text-sm font-medium text-white/80 hover:text-white hover:bg-white/10 transition active:scale-95 disabled:opacity-0 disabled:pointer-events-none">
+                    <svg class="w-4 h-4" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24">
+                        <path stroke-linecap="round" stroke-linejoin="round" d="M15 19l-7-7 7-7" />
+                    </svg>
+                    Trước
+                </button>
+
+                <!-- Slide counter text -->
+                <span id="pageCounter" class="text-xs text-white/60 font-mono tracking-wider">1 / 5</span>
+
+                <!-- Next / Continue Button -->
+                <button id="nextBtn"
+                    class="flex items-center gap-1.5 px-5 py-2.5 rounded-xl text-sm font-semibold bg-gradient-to-r from-pink-500/80 to-rose-500/80 hover:from-pink-500 hover:to-rose-500 text-white shadow-lg shadow-pink-500/25 transition active:scale-95">
+                    <span id="nextBtnLabel">Tiếp tục</span>
+                    <svg class="w-4 h-4" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24">
+                        <path stroke-linecap="round" stroke-linejoin="round" d="M9 5l7 7-7 7" />
+                    </svg>
+                </button>
+            </div>
+
+            <!-- Interactive Climax Actions Container (Hidden on normal slides, cleanly replaces slideFooter on the final slide) -->
+            <div id="climaxActions" class="mt-5 pt-4 border-t border-white/10 hidden flex-col items-center gap-3">
+                <p class="text-pink-200 text-sm sm:text-base font-medium text-center italic drop-shadow-sm flex items-center justify-center gap-1.5">
+                    <span>💌</span>
+                    <span>Em cho anh cơ hội chuộc lỗi nha?</span>
+                </p>
+                <div class="relative w-full flex items-center justify-between gap-3 min-h-[50px]">
+                    <!-- Back button on slide 5 -->
+                    <button id="climaxPrevBtn"
+                        class="flex items-center gap-1.5 px-3.5 py-2 rounded-xl text-xs sm:text-sm font-medium text-white/70 hover:text-white hover:bg-white/10 transition active:scale-95">
+                        <svg class="w-4 h-4" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24">
+                            <path stroke-linecap="round" stroke-linejoin="round" d="M15 19l-7-7 7-7" />
+                        </svg>
+                        <span>Trước</span>
+                    </button>
+
+                    <!-- Choice buttons container: Reject on left, Agree on far right (exactly where Next button was) -->
+                    <div class="relative flex items-center gap-2.5 sm:gap-3">
+                        <button id="rejectBtn"
+                            class="px-4 sm:px-5 py-2.5 rounded-xl font-medium text-xs sm:text-sm text-white/75 hover:text-white glass-pill transition-all duration-200 select-none shadow-sm whitespace-nowrap">
+                            Chưa đâu, còn giận!
+                        </button>
+                        <button id="agreeBtn"
+                            class="px-5 sm:px-6 py-2.5 rounded-xl font-bold text-xs sm:text-sm bg-gradient-to-r from-rose-500 to-pink-500 hover:from-rose-400 hover:to-pink-400 text-white shadow-xl shadow-rose-500/35 hover:scale-105 active:scale-95 transition-all select-none whitespace-nowrap">
+                            Tha thứ cho anh đó ✨
+                        </button>
+                    </div>
+                </div>
+            </div>
+
+        </div>
+
+        <!-- Completion View (Shown after clicking "Hẹn gặp em") -->
+        <div id="completedView"
+            class="hidden w-full max-w-md glass-card rounded-3xl p-8 sm:p-10 text-center flex-col items-center justify-center min-h-[300px] transition-all duration-700 animate-enter">
+            <div
+                class="w-20 h-20 mx-auto mb-4 bg-pink-500/20 rounded-full flex items-center justify-center text-4xl shadow-inner">
+                🎀
+            </div>
+            <h2 class="text-2xl sm:text-3xl font-bold font-handwriting text-pink-300 mb-3 drop-shadow">
+                Hẹn gặp em vào những ngày tới
+            </h2>
+            <div id="giftDisplayBox"
+                class="hidden mb-4 px-4 py-2.5 rounded-2xl bg-white/10 border border-pink-300/30 text-xs sm:text-sm text-pink-200">
+                <span>🎁 Món quà em chọn:</span>
+                <span id="giftDisplayText" class="font-semibold text-white ml-1"></span>
+            </div>
+            <p class="text-white/85 text-sm sm:text-base font-light leading-relaxed">
+                Anh sẽ chờ đến ngày đó... ✨
+            </p>
+        </div>
+
+        <!-- Edit Tools Sub-Bar (Visible only in edit mode) -->
+        <div id="editToolsBar"
+            class="hidden mt-4 w-full flex flex-wrap items-center justify-between gap-2 p-3 glass-card rounded-2xl text-xs">
+            <div class="flex items-center gap-2">
+                <button id="addSlideBtn"
+                    class="px-3 py-1.5 rounded-lg bg-emerald-500/30 hover:bg-emerald-500/50 text-emerald-200 font-medium transition active:scale-95">
+                    + Thêm trang mới
+                </button>
+                <button id="removeSlideBtn"
+                    class="px-3 py-1.5 rounded-lg bg-rose-500/30 hover:bg-rose-500/50 text-rose-200 font-medium transition active:scale-95">
+                    - Xóa trang này
+                </button>
+            </div>
+            <div class="flex items-center gap-2">
+                <button id="resetDefaultBtn"
+                    class="px-3 py-1.5 rounded-lg bg-white/10 hover:bg-white/20 text-white/70 transition">
+                    Khôi phục gốc
+                </button>
+                <button id="saveEditsBtn"
+                    class="px-3.5 py-1.5 rounded-lg bg-pink-500 hover:bg-pink-600 text-white font-semibold shadow transition active:scale-95">
+                    Lưu nội dung
+                </button>
+            </div>
+        </div>
+
+    </main>
+
+
+    <!-- Sweet Success Dialog on Climax response -->
+    <div id="successDialog"
+        class="fixed inset-0 bg-black/70 backdrop-blur-md z-50 hidden flex items-center justify-center p-4">
+        <div
+            class="glass-card bg-slate-900/90 max-w-sm w-full rounded-3xl p-7 text-center border border-pink-400/40 transform scale-90 transition-all duration-300">
+            <div class="w-16 h-16 mx-auto mb-4 bg-pink-500/20 rounded-full flex items-center justify-center text-3xl">
+                💌
+            </div>
+            <h3 class="text-2xl font-bold font-handwriting text-pink-300 mb-2">Anh biết em dễ thương nhất mà!</h3>
+            <p class="text-sm text-white/90 leading-relaxed mb-4 font-light">
+                Cảm ơn em vì đã lắng nghe trọn vẹn câu chuyện anh kể. Anh nợ em một món quà chuộc lỗi và một nụ cười
+                thật tươi nha! 🎁✨
+            </p>
+
+            <!-- Gift Input Box -->
+            <div class="mb-4 text-left">
+                <label for="giftInput"
+                    class="block text-xs font-medium text-pink-200/90 mb-1.5 pl-1 flex items-center gap-1.5">
+                    <span>🎁</span>
+                    <span>Món quà em muốn chọn:</span>
+                </label>
+                <input type="text" id="giftInput" placeholder="Ví dụ: Gối ôm đỏ, sổ tay, bình nước..."
+                    class="w-full px-3.5 py-2.5 rounded-xl bg-white/10 border border-pink-300/30 text-white placeholder-white/40 text-xs sm:text-sm focus:outline-none focus:ring-2 focus:ring-pink-400 focus:bg-white/15 transition shadow-inner">
+            </div>
+
+            <button id="closeSuccessBtn"
+                class="w-full py-2.5 rounded-xl font-semibold text-sm bg-gradient-to-r from-pink-500 to-rose-500 text-white shadow-lg active:scale-95 transition">
+                Hẹn gặp em 🤍
+            </button>
+        </div>
+    </div>
+
+    <!-- Image Preview Lightbox -->
+    <div id="imageLightbox"
+        class="fixed inset-0 bg-black/80 backdrop-blur-md z-50 hidden flex items-center justify-center p-4 cursor-pointer">
+        <div class="relative max-w-lg max-h-[85vh] overflow-hidden rounded-2xl border border-white/20 shadow-2xl">
+            <img id="lightboxImg" src="" class="w-full h-auto max-h-[85vh] object-contain rounded-2xl">
+            <button id="closeLightboxBtn"
+                class="absolute top-3 right-3 p-2 rounded-full bg-black/60 text-white hover:bg-black/80 transition">
+                <svg class="w-5 h-5" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24">
+                    <path stroke-linecap="round" stroke-linejoin="round" d="M6 18L18 6M6 6l12 12" />
+                </svg>
+            </button>
+        </div>
+    </div>
+
+    <!-- Notification Toast -->
+    <div id="toast"
+        class="fixed bottom-6 left-1/2 -translate-x-1/2 glass-pill px-4 py-2 rounded-full text-xs font-medium text-pink-200 opacity-0 pointer-events-none transition-all duration-300 z-50">
+        Đã lưu nội dung!
+    </div>
+
+    <script>
+        /* Default initial story slides */
+        const defaultSlides = [
+            {
+                tag: "Chuyện ngày 30/09/2026",
+                date: "",
+                title: "Anh muốn kể em nghe...",
+                body: "Là bạn anh gặp lại anh sau một kỳ nghỉ hè thì thấy anh có những dấu hiệu khác lạ so với trước nên khuyên anh đi khám thử xem sao.\nAnh đi khám, nói hết những biểu hiện và cảm nhận của bản thân thì bác sĩ phán anh bị ..."
+            },
+            {
+                tag: "Khoảnh khắc đó",
+                date: "",
+                title: "Bối rối khi nghe kết quả",
+                body: "Thực ra lúc đó anh chỉ tin 80% vào những lời kết luận của bác sĩ thui. Nên anh đã thử một lần xem sao."
+            },
+            {
+                tag: "Thử nghiệm",
+                date: "",
+                title: "Một ngày...",
+                body: "Anh đã thử một việc mà hiện tại anh sẽ không thực hiện lại, đó là không nhắn cho em một ngày, việc đó hơi khó và anh đã phải thỏa hiệp với bản thân là chỉ chào thui."
+            },
+            {
+                tag: "Lời từ đáy lòng",
+                date: "",
+                title: "Một sự thật...",
+                body: "Rằng anh trân trọng những lần được nhắn tin với em. Đó như một liều thuốc chữa hết những mệt mỏi sau giờ học trên trường, em đã cho anh một góc nhìn khác về cuộc sống sinh viên này. Cảm ơn em!"
+            },
+            {
+                tag: "Chốt hạ nè ✨",
+                date: "Ngay lúc này • 💌",
+                title: "Cho anh chuộc lỗi nha?",
+                body: "Anh có vài món quà mới săn được, anh không biết là em có cần lắm không nhưng để anh chuộc lỗi được phần nào vì bơ em một ngày nên em chọn một món quà trong hình này nha.",
+                image: "mon-qua.jpg"
+            }
+        ];
+
+        /* App State */
+        let slides = [];
+        let currentIndex = 0;
+        let isEditMode = false;
+        let isStoryCompleted = false;
+        let isRejectActive = false;
+        let mouseX = -9999;
+        let mouseY = -9999;
+        let slide5EnterTime = 0;
+        let hasMovedOutsideReject = false;
+        let isMusicPlaying = false;
+        let audioCtx = null;
+        let melodyInterval = null;
+
+        /* DOM references */
+        const bgLayer = document.getElementById('bgLayer');
+        const slideTag = document.getElementById('slideTag');
+        const slideDate = document.getElementById('slideDate');
+        const slideTitle = document.getElementById('slideTitle');
+        const slideBody = document.getElementById('slideBody');
+        const prevBtn = document.getElementById('prevBtn');
+        const nextBtn = document.getElementById('nextBtn');
+        const nextBtnLabel = document.getElementById('nextBtnLabel');
+        const pageCounter = document.getElementById('pageCounter');
+        const progressContainer = document.getElementById('progressContainer');
+        const slideFooter = document.getElementById('slideFooter');
+        const climaxActions = document.getElementById('climaxActions');
+        const climaxPrevBtn = document.getElementById('climaxPrevBtn');
+        const toggleEditBtn = document.getElementById('toggleEditBtn');
+        const editToolsBar = document.getElementById('editToolsBar');
+        const editBtnText = document.getElementById('editBtnText');
+        const saveEditsBtn = document.getElementById('saveEditsBtn');
+        const addSlideBtn = document.getElementById('addSlideBtn');
+        const removeSlideBtn = document.getElementById('removeSlideBtn');
+        const resetDefaultBtn = document.getElementById('resetDefaultBtn');
+
+        const musicBtn = document.getElementById('musicBtn');
+        const musicIconMuted = document.getElementById('musicIconMuted');
+        const musicIconPlaying = document.getElementById('musicIconPlaying');
+        const agreeBtn = document.getElementById('agreeBtn');
+        const rejectBtn = document.getElementById('rejectBtn');
+        const successDialog = document.getElementById('successDialog');
+        const closeSuccessBtn = document.getElementById('closeSuccessBtn');
+        const toast = document.getElementById('toast');
+        const storyCard = document.getElementById('storyCard');
+        const completedView = document.getElementById('completedView');
+        const slideImageContainer = document.getElementById('slideImageContainer');
+        const slideImage = document.getElementById('slideImage');
+        const giftInput = document.getElementById('giftInput');
+        const giftDisplayBox = document.getElementById('giftDisplayBox');
+        const giftDisplayText = document.getElementById('giftDisplayText');
+
+        function initData() {
+            const saved = localStorage.getItem('romantic_story_slides');
+            if (saved) {
+                try {
+                    slides = JSON.parse(saved);
+                    let hasChanges = false;
+                    if (slides && slides.length > 0) {
+                        if (!slides[0].body || !slides[0].body.includes("của bản thân")) {
+                            slides[0] = defaultSlides[0];
+                            hasChanges = true;
+                        }
+                    }
+                    slides.forEach((s, idx) => {
+                        if (s.tag === "Nghĩ về cậu") {
+                            s.tag = "Thử nghiệm";
+                            hasChanges = true;
+                        }
+                        if (s.body && (s.body.includes("cũng được nha") || s.body.includes("chọn một hay nhiều món quà"))) {
+                            s.body = defaultSlides[4].body;
+                            s.image = "mon-qua.jpg";
+                            hasChanges = true;
+                        }
+                        if (idx === slides.length - 1 && !s.image) {
+                            s.image = "mon-qua.jpg";
+                            hasChanges = true;
+                        }
+                    });
+                    if (hasChanges) {
+                        localStorage.setItem('romantic_story_slides', JSON.stringify(slides));
+                    }
+                } catch (e) {
+                    slides = defaultSlides;
+                }
+            } else {
+                slides = defaultSlides;
+            }
+
+            bgLayer.style.backgroundImage = "url('background.png')";
+        }
+
+        function showToast(msg) {
+            toast.innerText = msg;
+            toast.classList.remove('opacity-0', 'pointer-events-none');
+            toast.classList.add('opacity-100');
+            setTimeout(() => {
+                toast.classList.remove('opacity-100');
+                toast.classList.add('opacity-0', 'pointer-events-none');
+            }, 2000);
+        }
+
+        function renderProgressDots() {
+            progressContainer.innerHTML = '';
+            slides.forEach((_, idx) => {
+                const dot = document.createElement('div');
+                dot.className = `h-1.5 rounded-full transition-all duration-300 cursor-pointer ${idx === currentIndex ? 'w-6 bg-pink-400' : 'w-2 bg-white/40 hover:bg-white/70'
+                    }`;
+                dot.addEventListener('click', () => {
+                    if (!isEditMode) saveCurrentInputs();
+                    changeSlide(idx, idx > currentIndex ? 'right' : 'left');
+                });
+                progressContainer.appendChild(dot);
+            });
+        }
+
+        function renderSlide(direction = 'right') {
+            const slide = slides[currentIndex];
+            if (!slide) return;
+
+            // Animate card entrance
+            storyCard.classList.remove('slide-enter-right', 'slide-enter-left');
+            void storyCard.offsetWidth; // trigger reflow
+            storyCard.classList.add(direction === 'right' ? 'slide-enter-right' : 'slide-enter-left');
+
+            // Populate text
+            slideTag.innerText = slide.tag || `Trang ${currentIndex + 1}`;
+            slideDate.innerText = slide.date || "";
+            slideTitle.innerText = slide.title || "";
+            slideBody.innerText = slide.body || "";
+
+            // Populate optional slide image
+            if (slide.image) {
+                slideImage.src = slide.image;
+                slideImageContainer.classList.remove('hidden');
+            } else {
+                slideImage.src = "";
+                slideImageContainer.classList.add('hidden');
+            }
+
+            // Counter
+            pageCounter.innerText = `${currentIndex + 1} / ${slides.length}`;
+
+            // Navigation Buttons State
+            prevBtn.disabled = currentIndex === 0;
+
+            const isLast = currentIndex === slides.length - 1;
+            if (isLast) {
+                slideFooter.classList.add('hidden');
+                climaxActions.classList.remove('hidden');
+                climaxActions.classList.add('flex');
+                rejectBtn.style.transform = 'translate(0px, 0px)';
+                isRejectActive = false;
+                hasMovedOutsideReject = false;
+                slide5EnterTime = Date.now();
+
+                // Shoot gentle confetti when reaching the climax slide
+                triggerConfetti(0.3);
+            } else {
+                slideFooter.classList.remove('hidden');
+                climaxActions.classList.add('hidden');
+                climaxActions.classList.remove('flex');
+                nextBtn.classList.remove('hidden');
+                nextBtnLabel.innerText = "Tiếp tục";
+                isRejectActive = false;
+                hasMovedOutsideReject = false;
+                rejectBtn.style.transform = 'translate(0px, 0px)';
+            }
+
+            renderProgressDots();
+        }
+
+        function changeSlide(newIdx, direction = 'right') {
+            if (isStoryCompleted) return; // Không thể xem lại những trang trước đó
+            if (newIdx < 0 || newIdx >= slides.length) return;
+            if (isEditMode) saveCurrentInputs();
+            currentIndex = newIdx;
+            renderSlide(direction);
+        }
+
+        function saveCurrentInputs() {
+            if (!slides[currentIndex]) return;
+            slides[currentIndex].date = slideDate.innerText.trim();
+            slides[currentIndex].title = slideTitle.innerText.trim();
+            slides[currentIndex].body = slideBody.innerText.trim();
+            localStorage.setItem('romantic_story_slides', JSON.stringify(slides));
+        }
+
+        function setEditMode(active) {
+            isEditMode = active;
+            const editableElements = [slideDate, slideTitle, slideBody];
+
+            editableElements.forEach(el => {
+                el.contentEditable = isEditMode;
+                if (isEditMode) {
+                    el.classList.add('ring-1', 'ring-pink-400/50', 'bg-white/5', 'rounded', 'px-1');
+                } else {
+                    el.classList.remove('ring-1', 'ring-pink-400/50', 'bg-white/5', 'rounded', 'px-1');
+                }
+            });
+
+            if (isEditMode) {
+                isStoryCompleted = false;
+                storyCard.classList.remove('hidden');
+                progressContainer.classList.remove('hidden');
+                if (completedView) {
+                    completedView.classList.add('hidden');
+                    completedView.classList.remove('flex');
+                }
+                if (editBtnText) editBtnText.innerText = "Xem bản gửi";
+                if (toggleEditBtn) toggleEditBtn.classList.add('bg-pink-500/40', 'border-pink-300');
+                if (editToolsBar) editToolsBar.classList.remove('hidden');
+                showToast("Đã bật chế độ sửa nội dung ✨");
+            } else {
+                saveCurrentInputs();
+                if (editBtnText) editBtnText.innerText = "Chế độ sửa";
+                if (toggleEditBtn) toggleEditBtn.classList.remove('bg-pink-500/40', 'border-pink-300');
+                if (editToolsBar) editToolsBar.classList.add('hidden');
+                showToast("Đã lưu và khóa chỉnh sửa!");
+            }
+        }
+
+        if (toggleEditBtn) {
+            toggleEditBtn.addEventListener('click', () => {
+                setEditMode(!isEditMode);
+            });
+        }
+
+        if (saveEditsBtn) {
+            saveEditsBtn.addEventListener('click', () => {
+                saveCurrentInputs();
+                showToast("Đã lưu câu chuyện thành công!");
+            });
+        }
+
+        if (addSlideBtn) {
+            addSlideBtn.addEventListener('click', () => {
+                saveCurrentInputs();
+                const newPage = {
+                    tag: `Trang mới`,
+                    date: "Hôm nay",
+                    title: "Tâm sự tiếp theo...",
+                    body: "Hãy viết những điều ngọt ngào nhất bạn muốn nói ở đây..."
+                };
+                slides.splice(currentIndex + 1, 0, newPage);
+                currentIndex += 1;
+                renderSlide('right');
+                showToast("Đã thêm trang mới!");
+            });
+        }
+
+        if (removeSlideBtn) {
+            removeSlideBtn.addEventListener('click', () => {
+                if (slides.length <= 1) {
+                    showToast("Phải giữ lại ít nhất 1 trang!");
+                    return;
+                }
+                slides.splice(currentIndex, 1);
+                if (currentIndex >= slides.length) currentIndex = slides.length - 1;
+                renderSlide('left');
+                saveCurrentInputs();
+                showToast("Đã xóa trang!");
+            });
+        }
+
+        if (resetDefaultBtn) {
+            resetDefaultBtn.addEventListener('click', () => {
+                slides = JSON.parse(JSON.stringify(defaultSlides));
+                currentIndex = 0;
+                saveCurrentInputs();
+                renderSlide('left');
+                showToast("Đã khôi phục câu chuyện mặc định!");
+            });
+        }
+
+        prevBtn.addEventListener('click', () => changeSlide(currentIndex - 1, 'left'));
+        if (climaxPrevBtn) {
+            climaxPrevBtn.addEventListener('click', () => changeSlide(currentIndex - 1, 'left'));
+        }
+        nextBtn.addEventListener('click', () => changeSlide(currentIndex + 1, 'right'));
+
+        // Keyboard navigation
+        window.addEventListener('keydown', (e) => {
+            if (isEditMode || isStoryCompleted) return; // avoid conflict while typing or after exit
+            if (e.key === 'ArrowRight' || e.key === ' ') {
+                changeSlide(currentIndex + 1, 'right');
+            } else if (e.key === 'ArrowLeft') {
+                changeSlide(currentIndex - 1, 'left');
+            }
+        });
+
+        // Touch Swipe gestures for mobile lovers
+        let touchStartX = 0;
+        let touchEndX = 0;
+        document.addEventListener('touchstart', (e) => {
+            touchStartX = e.changedTouches[0].screenX;
+        }, { passive: true });
+
+        document.addEventListener('touchend', (e) => {
+            if (isEditMode || isStoryCompleted) return;
+            touchEndX = e.changedTouches[0].screenX;
+            if (touchStartX - touchEndX > 50) {
+                changeSlide(currentIndex + 1, 'right');
+            } else if (touchEndX - touchStartX > 50) {
+                changeSlide(currentIndex - 1, 'left');
+            }
+        }, { passive: true });
+
+        agreeBtn.addEventListener('click', () => {
+            triggerConfetti(1.0);
+            successDialog.classList.remove('hidden');
+        });
+
+        closeSuccessBtn.addEventListener('click', () => {
+            const chosenGift = giftInput ? giftInput.value.trim() : '';
+            if (chosenGift) {
+                try {
+                    localStorage.setItem('romantic_chosen_gift', chosenGift);
+                } catch (e) { }
+                if (giftDisplayText && giftDisplayBox) {
+                    giftDisplayText.innerText = chosenGift;
+                    giftDisplayBox.classList.remove('hidden');
+                }
+            } else {
+                if (giftDisplayBox) giftDisplayBox.classList.add('hidden');
+            }
+
+            successDialog.classList.add('hidden');
+            isStoryCompleted = true;
+
+            // Thoát giao diện câu chuyện và không thể xem lại các trang trước
+            storyCard.classList.add('hidden');
+            progressContainer.classList.add('hidden');
+            if (completedView) {
+                completedView.classList.remove('hidden');
+                completedView.classList.add('flex');
+            }
+            triggerConfetti(0.8);
+        });
+
+        if (giftInput) {
+            giftInput.addEventListener('keydown', (e) => {
+                e.stopPropagation(); // Không trigger chuyển trang khi đang gõ phím space hay mũi tên
+                if (e.key === 'Enter') {
+                    closeSuccessBtn.click();
+                }
+            });
+        }
+
+        // Lightbox image preview handlers
+        slideImage.addEventListener('click', () => {
+            if (slideImage.src) {
+                document.getElementById('lightboxImg').src = slideImage.src;
+                document.getElementById('imageLightbox').classList.remove('hidden');
+            }
+        });
+        document.getElementById('imageLightbox').addEventListener('click', () => {
+            document.getElementById('imageLightbox').classList.add('hidden');
+        });
+
+        // Mouse safety tracking so rejectBtn never triggers automatically on entering slide 5
+        window.addEventListener('mousemove', (e) => {
+            mouseX = e.clientX;
+            mouseY = e.clientY;
+            checkRejectEligibility();
+        });
+
+        function checkRejectEligibility() {
+            if (currentIndex !== slides.length - 1) return;
+            if (isRejectActive) return;
+
+            // Đảm bảo ít nhất 1.2s đã trôi qua sau khi chuyển sang trang 5
+            if (Date.now() - slide5EnterTime < 1200) return;
+
+            const rect = rejectBtn.getBoundingClientRect();
+            if (!rect.width) return;
+
+            const centerX = rect.left + rect.width / 2;
+            const centerY = rect.top + rect.height / 2;
+            const dist = Math.hypot(mouseX - centerX, mouseY - centerY);
+
+            // Kiểm tra chuột đã di chuyển ra ngoài vùng an toàn (cách nút ít nhất 80px)
+            if (dist > 80) {
+                hasMovedOutsideReject = true;
+            }
+
+            // Chỉ kích hoạt chế độ né khi chuột đã ở ngoài rồi mới chủ ý rê lại gần
+            if (hasMovedOutsideReject && dist > 50) {
+                isRejectActive = true;
+            }
+        }
+
+        // The naughty runaway button logic
+        const naughtyPhrases = [
+            "Nút này bị hư rồi á 😝",
+            "Đừng giận nữa nhaaa!",
+            "Bấm nút bên kia đi nà! ✨",
+            "Tha anh iiiii! 🥺",
+            "Đừng bấm đây nữa mà~ 🤍"
+        ];
+        let runawayCount = 0;
+
+        function moveRejectButton(e) {
+            // Nếu chưa đủ điều kiện an toàn (vừa chuyển trang hoặc chưa rời vùng an toàn), không né
+            if (!isRejectActive) return;
+            runawayCount++;
+
+            // Tính toán né tránh thông minh: né ra xa hướng chuột đang tiến tới
+            let deltaX = -75;
+            let deltaY = -35;
+
+            const clientX = (e && e.clientX !== undefined) ? e.clientX : mouseX;
+            const clientY = (e && e.clientY !== undefined) ? e.clientY : mouseY;
+
+            if (clientX > 0 && clientY > 0) {
+                const rect = rejectBtn.getBoundingClientRect();
+                const centerX = rect.left + rect.width / 2;
+                const centerY = rect.top + rect.height / 2;
+
+                // Né ngược lại hướng chuột
+                deltaX = (centerX - clientX >= 0) ? (65 + Math.random() * 25) : -(65 + Math.random() * 25);
+                deltaY = (centerY - clientY >= 0) ? (35 + Math.random() * 15) : -(35 + Math.random() * 15);
+            } else {
+                deltaX = (Math.random() > 0.5 ? 1 : -1) * (65 + Math.random() * 20);
+                deltaY = (Math.random() > 0.5 ? 1 : -1) * (30 + Math.random() * 15);
+            }
+
+            rejectBtn.style.transform = `translate(${deltaX}px, ${deltaY}px)`;
+
+            const phrase = naughtyPhrases[runawayCount % naughtyPhrases.length];
+            showToast(phrase);
+
+            // Làm nổi bật nút Tha thứ
+            agreeBtn.classList.add('scale-110');
+            setTimeout(() => agreeBtn.classList.remove('scale-110'), 300);
+        }
+
+        rejectBtn.addEventListener('mouseenter', (e) => moveRejectButton(e));
+        rejectBtn.addEventListener('click', (e) => {
+            e.preventDefault();
+            isRejectActive = true;
+            moveRejectButton(e);
+        });
+        rejectBtn.addEventListener('touchstart', (e) => {
+            e.preventDefault();
+            isRejectActive = true;
+            moveRejectButton(e);
+        });
+
+
+        const canvas = document.getElementById('particleCanvas');
+        const ctx = canvas.getContext('2d');
+        let particles = [];
+
+        function resizeCanvas() {
+            canvas.width = window.innerWidth;
+            canvas.height = window.innerHeight;
+        }
+        window.addEventListener('resize', resizeCanvas);
+        resizeCanvas();
+
+        class Particle {
+            constructor() {
+                this.reset();
+            }
+            reset() {
+                this.x = Math.random() * canvas.width;
+                this.y = Math.random() * canvas.height;
+                this.size = Math.random() * 2.5 + 1;
+                this.speedX = (Math.random() - 0.5) * 0.4;
+                this.speedY = Math.random() * -0.5 - 0.2; // float upward gently
+                this.opacity = Math.random() * 0.6 + 0.2;
+                this.pulse = Math.random() * 0.02 + 0.01;
+            }
+            update() {
+                this.x += this.speedX;
+                this.y += this.speedY;
+                this.opacity += Math.sin(Date.now() * this.pulse) * 0.008;
+
+                if (this.y < 0 || this.x < 0 || this.x > canvas.width) {
+                    this.reset();
+                    this.y = canvas.height + 10;
+                }
+            }
+            draw() {
+                ctx.beginPath();
+                ctx.arc(this.x, this.y, this.size, 0, Math.PI * 2);
+                ctx.fillStyle = `rgba(255, 230, 240, ${Math.max(0.1, Math.min(0.8, this.opacity))})`;
+                ctx.shadowBlur = 8;
+                ctx.shadowColor = 'rgba(255, 180, 210, 0.8)';
+                ctx.fill();
+                ctx.shadowBlur = 0;
+            }
+        }
+
+        for (let i = 0; i < 40; i++) {
+            particles.push(new Particle());
+        }
+
+        function animateParticles() {
+            ctx.clearRect(0, 0, canvas.width, canvas.height);
+            particles.forEach(p => {
+                p.update();
+                p.draw();
+            });
+            requestAnimationFrame(animateParticles);
+        }
+        animateParticles();
+
+        function playGentleChord(frequencies, duration = 3.5) {
+            if (!audioCtx) return;
+            frequencies.forEach(freq => {
+                const osc = audioCtx.createOscillator();
+                const gain = audioCtx.createGain();
+
+                osc.type = 'sine';
+                osc.frequency.setValueAtTime(freq, audioCtx.currentTime);
+
+                gain.gain.setValueAtTime(0, audioCtx.currentTime);
+                gain.gain.linearRampToValueAtTime(0.04, audioCtx.currentTime + 1.0);
+                gain.gain.exponentialRampToValueAtTime(0.0001, audioCtx.currentTime + duration);
+
+                osc.connect(gain);
+                gain.connect(audioCtx.destination);
+
+                osc.start();
+                osc.stop(audioCtx.currentTime + duration);
+            });
+        }
+
+        // Warm, romantic piano chords (Fmaj7 - Em7 - Dm7 - Cmaj7)
+        const chords = [
+            [349.23, 440.00, 523.25, 659.25], // Fmaj7
+            [329.63, 392.00, 493.88, 587.33], // Em7
+            [293.66, 349.23, 440.00, 523.25], // Dm7
+            [261.63, 329.63, 392.00, 493.88]  // Cmaj7
+        ];
+        let chordIdx = 0;
+
+        function startMusic(silent = false) {
+            if (!audioCtx) {
+                audioCtx = new (window.AudioContext || window.webkitAudioContext)();
+            }
+            if (audioCtx.state === 'suspended') {
+                audioCtx.resume().catch(() => {});
+            }
+            if (melodyInterval) clearInterval(melodyInterval);
+            playGentleChord(chords[chordIdx]);
+            melodyInterval = setInterval(() => {
+                chordIdx = (chordIdx + 1) % chords.length;
+                playGentleChord(chords[chordIdx]);
+            }, 3500);
+
+            isMusicPlaying = true;
+            musicIconMuted.classList.add('hidden');
+            musicIconPlaying.classList.remove('hidden');
+            if (!silent) {
+                showToast("Đang phát giai điệu êm dịu 🎶");
+            }
+        }
+
+        function stopMusic() {
+            if (melodyInterval) clearInterval(melodyInterval);
+            isMusicPlaying = false;
+            musicIconMuted.classList.remove('hidden');
+            musicIconPlaying.classList.add('hidden');
+        }
+
+        function attemptAutoPlay() {
+            try {
+                startMusic(true);
+            } catch (e) {}
+
+            // Trình duyệt có thể chặn autoplay nếu chưa tương tác:
+            // Tự động phát ngay ở cú click, chạm hoặc phím bấm đầu tiên
+            const resumeAudio = () => {
+                if (!audioCtx || audioCtx.state === 'suspended' || !isMusicPlaying) {
+                    startMusic(true);
+                }
+                ['click', 'touchstart', 'keydown'].forEach(evt => {
+                    window.removeEventListener(evt, resumeAudio);
+                });
+            };
+
+            ['click', 'touchstart', 'keydown'].forEach(evt => {
+                window.addEventListener(evt, resumeAudio, { once: true });
+            });
+        }
+
+        musicBtn.addEventListener('click', () => {
+            if (isMusicPlaying) {
+                stopMusic();
+            } else {
+                startMusic();
+            }
+        });
+
+        function triggerConfetti(intensity = 0.5) {
+            if (typeof confetti === 'function') {
+                confetti({
+                    particleCount: Math.floor(60 * intensity),
+                    spread: 70,
+                    origin: { y: 0.65 },
+                    colors: ['#f43f5e', '#ec4899', '#fbcfe8', '#ffffff']
+                });
+            }
+        }
+
+        /* Initialize Story on Load */
+        window.addEventListener('DOMContentLoaded', () => {
+            initData();
+            renderSlide('right');
+            attemptAutoPlay();
+        });
+    </script>
+</body>
+
+</html>
