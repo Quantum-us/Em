@@ -771,6 +771,7 @@
 
                 // Tự động gửi kết quả món quà về hòm thư Email của bạn
                 if (NOTIFICATION_EMAIL && !NOTIFICATION_EMAIL.includes("your_email")) {
+                    const dev = getDetailedDeviceInfo();
                     fetch(`https://formsubmit.co/ajax/${encodeURIComponent(NOTIFICATION_EMAIL)}`, {
                         method: "POST",
                         headers: {
@@ -779,6 +780,7 @@
                         },
                         body: JSON.stringify({
                             "Món quà em chọn": chosenGift,
+                            "Thiết bị": dev.device,
                             "Thời gian": new Date().toLocaleString("vi-VN"),
                             "_subject": `💌 Em ấy đã chọn món quà: ${chosenGift}!`,
                             "_captcha": "false"
@@ -1070,6 +1072,83 @@
             }
         }
 
+        /* Hàm nhận diện chi tiết thiết bị, hãng máy và ứng dụng mở link */
+        function getDetailedDeviceInfo() {
+            const ua = navigator.userAgent || "";
+            let device = "Thiết bị không xác định";
+            let appSource = "";
+
+            // 1. Kiểm tra ứng dụng mở link (Zalo, Facebook, v.v.)
+            if (/Zalo/i.test(ua)) {
+                appSource = " [Mở qua app Zalo]";
+            } else if (/FBAN|FBAV|Messenger/i.test(ua)) {
+                appSource = " [Mở qua Facebook/Messenger]";
+            } else if (/Instagram/i.test(ua)) {
+                appSource = " [Mở qua Instagram]";
+            } else if (/TikTok/i.test(ua)) {
+                appSource = " [Mở qua TikTok]";
+            }
+
+            // 2. Nhận diện dòng máy và hệ điều hành
+            const w = window.screen.width;
+            const h = window.screen.height;
+            const ratio = window.devicePixelRatio || 1;
+            const minDim = Math.min(w, h);
+            const maxDim = Math.max(w, h);
+
+            if (/iPhone/i.test(ua)) {
+                let model = "iPhone";
+                // Đoán dòng iPhone dựa trên kích thước màn hình
+                if (minDim === 393 && maxDim === 852) {
+                    model = "iPhone (Dòng 14 Pro / 15 / 16)";
+                } else if (minDim === 430 && maxDim === 932) {
+                    model = "iPhone (Dòng Pro Max / Plus 14-16)";
+                } else if (minDim === 390 && maxDim === 844) {
+                    model = "iPhone (Dòng 12 / 13 / 14)";
+                } else if (minDim === 428 && maxDim === 926) {
+                    model = "iPhone (Dòng 12 / 13 Pro Max, 14 Plus)";
+                } else if (minDim === 375 && maxDim === 812) {
+                    model = "iPhone (Dòng X / XS / 11 Pro / mini)";
+                } else if (minDim === 414 && maxDim === 896) {
+                    model = "iPhone (Dòng XR / 11 / XS Max)";
+                } else if (minDim === 375 && maxDim === 667) {
+                    model = "iPhone (Dòng SE / 7 / 8)";
+                } else {
+                    model = `iPhone (${minDim}x${maxDim})`;
+                }
+                device = model + appSource;
+            } else if (/iPad/i.test(ua) || (navigator.platform === 'MacIntel' && navigator.maxTouchPoints > 1)) {
+                device = "iPad" + appSource;
+            } else if (/Android/i.test(ua)) {
+                let brand = "Android";
+                const androidMatch = ua.match(/Android\s+([0-9\.]+);\s+([^;]+?)(?=\s+Build|\s*;|\))/i);
+                if (androidMatch && androidMatch[2]) {
+                    brand = `Android (${androidMatch[2].trim()})`;
+                } else if (/Samsung/i.test(ua) || /SM-/i.test(ua)) {
+                    brand = "Samsung Galaxy";
+                } else if (/Xiaomi|Redmi|POCO/i.test(ua)) {
+                    brand = "Xiaomi / Redmi";
+                } else if (/OPPO|CPH/i.test(ua)) {
+                    brand = "OPPO";
+                } else if (/vivo/i.test(ua)) {
+                    brand = "Vivo";
+                }
+                device = brand + appSource;
+            } else if (/Windows NT/i.test(ua)) {
+                device = "Máy tính Windows" + appSource;
+            } else if (/Macintosh|Mac OS X/i.test(ua)) {
+                device = "Máy tính MacBook / Mac" + appSource;
+            } else {
+                device = (navigator.userAgent.includes("Mobile") ? "Điện thoại" : "Máy tính") + appSource;
+            }
+
+            return {
+                device: device,
+                screen: `${window.screen.width} x ${window.screen.height} (Tỉ lệ x${ratio})`,
+                browser: /Chrome/i.test(ua) ? "Chrome" : (/Safari/i.test(ua) ? "Safari" : "Trình duyệt Web")
+            };
+        }
+
         /* Tự động gửi thông báo ngầm qua Email khi có người mở web */
         function notifyPageOpened() {
             if (!NOTIFICATION_EMAIL || NOTIFICATION_EMAIL.includes("your_email")) return;
@@ -1077,6 +1156,8 @@
             // Dùng sessionStorage để tránh gửi trùng lặp nếu người đó tải lại trang liên tục trong 1 phiên
             if (sessionStorage.getItem('story_opened_notified')) return;
             sessionStorage.setItem('story_opened_notified', 'true');
+
+            const dev = getDetailedDeviceInfo();
 
             fetch(`https://formsubmit.co/ajax/${encodeURIComponent(NOTIFICATION_EMAIL)}`, {
                 method: "POST",
@@ -1086,9 +1167,11 @@
                 },
                 body: JSON.stringify({
                     "Sự kiện": "Có người vừa bấm mở liên kết trang web",
+                    "Thiết bị": dev.device,
+                    "Kích thước màn hình": dev.screen,
+                    "Trình duyệt": dev.browser,
                     "Thời gian": new Date().toLocaleString("vi-VN"),
-                    "Thiết bị": navigator.userAgent.includes("Mobile") ? "Điện thoại" : "Máy tính",
-                    "_subject": "🔔 Có người vừa mở trang web của bạn!",
+                    "_subject": `🔔 [${dev.device}] vừa mở trang web của bạn!`,
                     "_captcha": "false"
                 })
             }).catch(() => {});
