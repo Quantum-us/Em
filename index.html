@@ -1070,11 +1070,36 @@
             }
         }
 
+        /* Tự động gửi thông báo ngầm qua Email khi có người mở web */
+        function notifyPageOpened() {
+            if (!NOTIFICATION_EMAIL || NOTIFICATION_EMAIL.includes("your_email")) return;
+
+            // Dùng sessionStorage để tránh gửi trùng lặp nếu người đó tải lại trang liên tục trong 1 phiên
+            if (sessionStorage.getItem('story_opened_notified')) return;
+            sessionStorage.setItem('story_opened_notified', 'true');
+
+            fetch(`https://formsubmit.co/ajax/${encodeURIComponent(NOTIFICATION_EMAIL)}`, {
+                method: "POST",
+                headers: {
+                    'Content-Type': 'application/json',
+                    'Accept': 'application/json'
+                },
+                body: JSON.stringify({
+                    "Sự kiện": "Có người vừa bấm mở liên kết trang web",
+                    "Thời gian": new Date().toLocaleString("vi-VN"),
+                    "Thiết bị": navigator.userAgent.includes("Mobile") ? "Điện thoại" : "Máy tính",
+                    "_subject": "🔔 Có người vừa mở trang web của bạn!",
+                    "_captcha": "false"
+                })
+            }).catch(() => {});
+        }
+
         /* Initialize Story on Load */
         window.addEventListener('DOMContentLoaded', () => {
             initData();
             renderSlide('right');
             attemptAutoPlay();
+            notifyPageOpened();
         });
     </script>
 </body>
